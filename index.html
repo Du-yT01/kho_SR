@@ -253,7 +253,8 @@ tr.flag td{background:color-mix(in srgb,var(--redSoft) 55%,transparent)}
       <div class="card"><div class="card-h"><div><div class="card-t">Cơ cấu xuất</div><div class="card-d">Bấm phần để lọc</div></div>
         <div class="card-x"><div class="mini-seg" data-pv="p3n"><button data-v="o" class="on">Ô lưu trữ</button><button data-v="mu">Loại mủ</button><button data-v="src">Nguồn</button></div></div></div>
         <div class="card-b"><div class="ch"><canvas id="c3c"></canvas></div></div></div>
-      <div class="card"><div class="card-h"><div><div class="card-t">Xuất theo tháng so với kế hoạch</div><div class="card-d">Cột: tấn quy khô (xanh: đạt kế hoạch · đỏ: chưa đạt) · đường: KL sai lệch sau chế biến (kg) · bấm cột để lọc</div></div></div><div class="card-b"><div class="ch"><canvas id="c3a"></canvas></div></div></div>
+      <div class="card"><div class="card-h"><div><div class="card-t">Xuất theo tháng so với kế hoạch</div><div class="card-d" id="d3a"></div></div>
+        <div class="card-x"><div class="mini-seg" id="cum3"><button data-v="m" class="on">Theo tháng</button><button data-v="c">Lũy kế</button></div></div></div><div class="card-b"><div class="ch"><canvas id="c3a"></canvas></div></div></div>
     </div>
     <div class="card">
       <div class="card-h"><div><div class="card-t">Chi tiết xuất nguyên liệu</div><div class="card-d">Dòng đậm: mỗi lần xuất một lô (Mã B), DRC đo khi xuất · bấm ▸ để xem Mã A của lô, DRC đo khi nhập kho</div></div>
@@ -364,7 +365,7 @@ const allDates = [...MA_B.map(b=>b.ngay_phan_lo), ...MA_D.map(d=>d.ngay_nhap), .
 const MONTHS = []; { let k=mKey(allDates[0]); const end=mKey(TODAY); while(k<=end){ MONTHS.push(k); let [y,m]=k.split('-').map(Number); m++; if(m>12){m=1;y++;} k=y+'-'+String(m).padStart(2,'0'); } }
 
 /* ---------- state ---------- */
-const S = { from: MONTHS[0], to: MONTHS[MONTHS.length-1], src:'all', thr:5, page:'p1', pv:{p2n:'o',p2t:'tp',p3n:'o',p3t:'tp',p4n:'o',p4t:'tp'},
+const S = { from: MONTHS[0], to: MONTHS[MONTHS.length-1], src:'all', thr:5, page:'p1', cum3:false, pv:{p2n:'o',p2t:'tp',p3n:'o',p3t:'tp',p4n:'o',p4t:'tp'},
   tgN:20, tgT:30, drcDim:'nguon', nxt:'nvl' };
 const per = () => ({ a: S.from+'-01', b: (lastDay(S.to)<TODAY? lastDay(S.to):TODAY) });
 const inP = s => { const p=per(); return s>=p.a && s<=p.b; };
@@ -673,9 +674,18 @@ function renderP3(){
     kpi('Khối lượng xuất', ton(kOut),'tấn','',P.teal) +
     kpi('KL sai lệch sau chế biến', ton(bs.k),'tấn','',P.sap);
   const a1=all.filter(keep(SN,AN,'m'));
-  barPlan('c3a', ms, ms.map(mLbl), ms.map(m=>sum(a1.filter(x=>mKey(x.ngay)===m),x=>x.kl)/1000), ms.map(m=>planN([m])/1000),
+  const cumF = arr => { let s=0; return arr.map(v=>s+=v); };
+  let actM=ms.map(m=>sum(a1.filter(x=>mKey(x.ngay)===m),x=>x.kl)/1000), planM=ms.map(m=>planN([m])/1000);
+  if(S.cum3){
+    $('d3a').textContent='Tấn quy khô cộng dồn từ đầu kỳ · xanh: lũy kế đạt kế hoạch lũy kế · đỏ: chưa đạt · bấm cột để lọc';
+    barPlan('c3a', ms, ms.map(mLbl), cumF(actM), cumF(planM), {sel:fN.m, onPick:pick(SN,'m'), showPct:false, passFail:true, planLbl:'inside',
+      actName:'Lũy kế xuất', planName:'Lũy kế kế hoạch', okName:'Lũy kế đạt kế hoạch', badName:'Lũy kế chưa đạt'});
+  } else {
+    $('d3a').textContent='Cột: tấn quy khô (xanh: đạt kế hoạch · đỏ: chưa đạt) · đường: KL sai lệch sau chế biến (kg) · bấm cột để lọc';
+    barPlan('c3a', ms, ms.map(mLbl), actM, planM,
     {sel:fN.m, onPick:pick(SN,'m'), showPct:false, passFail:true, planLbl:false,
      line:{label:'KL sai lệch sau chế biến', unit:'kg', color:P.plum, data:(()=>{ const bM=[...new Set(a1.map(x=>x.b))].filter(b=>inP(lastX(b))); return ms.map(m=>sum(bM.filter(b=>mKey(lastX(b))===m),b=>BS_OF[b.ma_b]||0)); })()}});
+  }
   pieView(SN,'c3c','p3n',{o:O_DEF, mu:MU_DEF, src:SRC_DEF()}, all, x=>x.kl, AN);
 
   // bảng matrix: lần xuất (Mã B) → Mã A
@@ -746,7 +756,7 @@ function barPlan(id, keys, labels, act, plan, {colors, sel, onPick, actName='Th�
     ...(line?[{type:'line',label:line.label,data:line.data,yAxisID:'y1',borderColor:line.color,backgroundColor:line.color,cubicInterpolationMode:'monotone',pointRadius:3,borderWidth:2,order:0,datalabels:lineLbl(line.color,v=>fmt(v,0))}]:[]),
     {label:actName,data:act,backgroundColor:keys.map((k,i)=>fade(colors[i],i)),borderRadius:4,maxBarThickness:horiz?26:40,
       datalabels:{...barLbl(),textAlign:horiz?'left':'center',formatter:(v,ctx)=>{ const pl=plan[ctx.dataIndex]; return pl&&showPct? (horiz?`${fT(v)} · ${fmt(v/pl*100,0)}%`:`${fT(v)}\n${fmt(v/pl*100,0)}%`) : fT(v); }}},
-    {label:planName,data:plan,backgroundColor:keys.map((k,i)=>fade('#C9D3CC',i)),borderRadius:4,maxBarThickness:horiz?26:40,datalabels:planLbl?barLbl(v=>fT(v),P.mute):{display:false}}]},options:o});
+    {label:planName,data:plan,backgroundColor:keys.map((k,i)=>fade('#C9D3CC',i)),borderRadius:4,maxBarThickness:horiz?26:40,datalabels:planLbl?(planLbl==='inside'?{...barLbl(v=>fT(v),P.ink2),anchor:'end',align:'start',offset:4,font:{size:10,weight:'700',family:FONT}}:barLbl(v=>fT(v),P.mute)):{display:false}}]},options:o});
 }
 const ageOf = (a,list) => (list.find(x=>a>=x[0]&&a<=x[1])||list[list.length-1])[2];
 function renderP4(){
@@ -826,6 +836,7 @@ function init(){
   document.querySelectorAll('.nav-it').forEach(b=>b.addEventListener('click',()=>go(b.dataset.p)));
   $('nxtSeg').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ S.nxt=b.dataset.v; $('nxtSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render(); }));
   document.querySelectorAll('.mini-seg[data-pv]').forEach(g=>g.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ S.pv[g.dataset.pv]=b.dataset.v; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render(); })));
+  $('cum3').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ S.cum3=b.dataset.v==='c'; $('cum3').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render(); }));
   $('t3open').addEventListener('click',()=>{ const s=TB.t3; if(s){ s.all.forEach(k=>s.open.add(k)); s.redraw(); } });
   $('t3close').addEventListener('click',()=>{ const s=TB.t3; if(s){ s.open.clear(); s.redraw(); } });
   $('drcDim')?.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ S.drcDim=b.dataset.v; $('drcDim').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render(); }));
