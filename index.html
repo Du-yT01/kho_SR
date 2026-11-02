@@ -677,9 +677,31 @@ function renderP3(){
   const cumF = arr => { let s=0; return arr.map(v=>s+=v); };
   let actM=ms.map(m=>sum(a1.filter(x=>mKey(x.ngay)===m),x=>x.kl)/1000), planM=ms.map(m=>planN([m])/1000);
   if(S.cum3){
-    $('d3a').textContent='Tấn quy khô cộng dồn từ đầu kỳ · xanh: lũy kế đạt kế hoạch lũy kế · đỏ: chưa đạt · bấm cột để lọc';
-    barPlan('c3a', ms, ms.map(mLbl), cumF(actM), cumF(planM), {sel:fN.m, onPick:pick(SN,'m'), showPct:false, passFail:true, planLbl:'inside',
-      actName:'Lũy kế xuất', planName:'Lũy kế kế hoạch', okName:'Lũy kế đạt kế hoạch', badName:'Lũy kế chưa đạt'});
+    $('d3a').textContent='Đường: tấn quy khô cộng dồn từ đầu kỳ · cột: % đạt kế hoạch lũy kế đến từng tháng · bấm để lọc';
+    const ca=cumF(actM), cp=cumF(planM);
+    const ol=base(); ol.interaction={mode:'index',intersect:false};
+    ol.plugins.tooltip.callbacks={label:c=>` ${c.dataset.label}: ${fmt(c.parsed.y,1)} tấn`, afterBody:it=>{ const i=it[0].dataIndex; return cp[i]? `Đạt: ${fmt(ca[i]/cp[i]*100,0)}% kế hoạch lũy kế`:''; }};
+    ol.plugins.legend.labels.usePointStyle=false; ol.plugins.legend.labels.boxHeight=3; ol.plugins.legend.labels.boxWidth=22;
+    ol.onClick=(e,el)=>{ if(!el.length) return; pick(SN,'m')(ms[el[0].index]); };
+    const pr=ms.map(m=>fN.m===m?6:3.5);
+    const pctD=ca.map((v,i)=>cp[i]?v/cp[i]*100:null), pMax=Math.max(100,...pctD.filter(v=>v!=null));
+    const lMax=Math.max(...ca,...cp,1);
+    ol.scales.y.title={display:true,text:'tấn',color:P.mute,font:{size:10.5}};
+    ol.scales.y.min=-lMax*0.62; ol.scales.y.max=lMax*1.12; ol.scales.y.beginAtZero=false; ol.scales.y.grace=0;
+    ol.scales.y.ticks={...ol.scales.y.ticks,callback:v=>v<0||v>lMax?'':fmt(v)}; ol.scales.y.grid={color:c=>c.tick.value<0?'transparent':P.line};
+    ol.scales.y1={position:'right',min:0,max:Math.ceil(pMax*3.4/10)*10,grid:{display:false},border:{display:false},
+      ticks:{color:P.mute,font:{size:11},stepSize:50,callback:v=>v<=Math.ceil(pMax/10)*10?v+'%':''},title:{display:true,text:'% đạt',color:P.mute,font:{size:10.5}}};
+    ol.plugins.tooltip.callbacks.label=c=>c.dataset.yAxisID==='y1'?` ${c.dataset.label}: ${fmt(c.parsed.y,1)}%`:` ${c.dataset.label}: ${fmt(c.parsed.y,1)} tấn`;
+    ol.plugins.tooltip.callbacks.afterBody=()=>'';
+    ol.plugins.legend.labels.generateLabels=ch=>[{text:'Đạt (≥ 100%)',fillStyle:alpha(P.leaf,.8),strokeStyle:alpha(P.leaf,.8),lineWidth:0},{text:'Chưa đạt (< 100%)',fillStyle:alpha(P.red,.8),strokeStyle:alpha(P.red,.8),lineWidth:0},
+      ...ch.data.datasets.slice(1).map((d,i)=>({text:d.label,fillStyle:d.borderColor,strokeStyle:d.borderColor,lineWidth:0,datasetIndex:i+1,hidden:!ch.isDatasetVisible(i+1)}))];
+    draw('c3a',{type:'line',data:{labels:ms.map(mLbl),datasets:[
+      {type:'bar',label:'% đạt kế hoạch lũy kế',data:pctD,yAxisID:'y1',order:10,backgroundColor:ms.map((m,i)=>{ const c=pctD[i]!=null&&pctD[i]>=100?P.leaf:P.red; return fN.m&&fN.m!==m?alpha(c,.22):alpha(c,.8); }),borderRadius:4,maxBarThickness:34,
+        datalabels:{display:ctx=>pctD[ctx.dataIndex]!=null,anchor:'end',align:'start',offset:4,color:'#fff',font:{size:10,weight:'700',family:FONT},formatter:v=>fmt(v,0)+'%'}},
+      {label:'Lũy kế xuất thực tế',order:1,data:ca,borderColor:P.teal,backgroundColor:P.teal,borderWidth:2.5,cubicInterpolationMode:'monotone',pointRadius:pr,
+        datalabels:{...lineLbl(P.teal,v=>fT(v)),align:'top'}},
+      {label:'Lũy kế kế hoạch',order:2,data:cp,borderColor:P.sap,backgroundColor:P.sap,borderWidth:2.5,borderDash:[6,4],cubicInterpolationMode:'monotone',pointRadius:pr,pointStyle:'rectRot',
+        datalabels:{...lineLbl(P.sap,v=>fT(v)),align:'bottom'}}]},options:ol});
   } else {
     $('d3a').textContent='Cột: tấn quy khô (xanh: đạt kế hoạch · đỏ: chưa đạt) · đường: KL sai lệch sau chế biến (kg) · bấm cột để lọc';
     barPlan('c3a', ms, ms.map(mLbl), actM, planM,
