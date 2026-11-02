@@ -110,7 +110,7 @@ table.mx .ind{display:inline-block;width:30px}.c211{grid-template-columns:2fr 1f
 .card-x{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .card-b{padding:4px 16px 14px;flex:1;min-height:0}
 .ch{position:relative;height:270px}
-.ch.sm{height:230px}.ch.lg{height:310px}
+.ch.sm{height:230px}.ch.xl{height:350px}.ch.lg{height:310px}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;background:var(--sapSoft);color:var(--sapInk);border-radius:20px;padding:3px 6px 3px 10px}
 .chip button{border:0;background:rgba(0,0,0,.08);border-radius:50%;width:17px;height:17px;cursor:pointer;line-height:1;font-size:11px}
 .hint{font-size:11px;color:var(--mute)}
@@ -252,9 +252,8 @@ tr.flag td{background:color-mix(in srgb,var(--redSoft) 55%,transparent)}
       <div class="kcol" id="k3n"></div>
       <div class="card"><div class="card-h"><div><div class="card-t">Cơ cấu xuất</div><div class="card-d">Bấm phần để lọc</div></div>
         <div class="card-x"><div class="mini-seg" data-pv="p3n"><button data-v="o" class="on">Ô lưu trữ</button><button data-v="mu">Loại mủ</button><button data-v="src">Nguồn</button></div></div></div>
-        <div class="card-b"><div class="ch"><canvas id="c3c"></canvas></div></div></div>
-      <div class="card"><div class="card-h"><div><div class="card-t">Xuất theo tháng so với kế hoạch</div><div class="card-d" id="d3a"></div></div>
-        <div class="card-x"><div class="mini-seg" id="cum3"><button data-v="m" class="on">Theo tháng</button><button data-v="c">Lũy kế</button></div></div></div><div class="card-b"><div class="ch"><canvas id="c3a"></canvas></div></div></div>
+        <div class="card-b"><div class="ch xl"><canvas id="c3c"></canvas></div></div></div>
+      <div class="card"><div class="card-h"><div><div class="card-t">Xuất theo tháng so với kế hoạch</div><div class="card-d">Cột: tấn quy khô theo tháng (xanh: đạt kế hoạch · đỏ: chưa đạt) · đường: lũy kế từ đầu kỳ · bấm để lọc</div></div></div><div class="card-b"><div class="ch xl"><canvas id="c3a"></canvas></div></div></div>
     </div>
     <div class="card">
       <div class="card-h"><div><div class="card-t">Chi tiết xuất nguyên liệu</div><div class="card-d">Dòng đậm: mỗi lần xuất một lô (Mã B), DRC đo khi xuất · bấm ▸ để xem Mã A của lô, DRC đo khi nhập kho</div></div>
@@ -365,7 +364,7 @@ const allDates = [...MA_B.map(b=>b.ngay_phan_lo), ...MA_D.map(d=>d.ngay_nhap), .
 const MONTHS = []; { let k=mKey(allDates[0]); const end=mKey(TODAY); while(k<=end){ MONTHS.push(k); let [y,m]=k.split('-').map(Number); m++; if(m>12){m=1;y++;} k=y+'-'+String(m).padStart(2,'0'); } }
 
 /* ---------- state ---------- */
-const S = { from: MONTHS[0], to: MONTHS[MONTHS.length-1], src:'all', thr:5, page:'p1', cum3:false, pv:{p2n:'o',p2t:'tp',p3n:'o',p3t:'tp',p4n:'o',p4t:'tp'},
+const S = { from: MONTHS[0], to: MONTHS[MONTHS.length-1], src:'all', thr:5, page:'p1', pv:{p2n:'o',p2t:'tp',p3n:'o',p3t:'tp',p4n:'o',p4t:'tp'},
   tgN:20, tgT:30, drcDim:'nguon', nxt:'nvl' };
 const per = () => ({ a: S.from+'-01', b: (lastDay(S.to)<TODAY? lastDay(S.to):TODAY) });
 const inP = s => { const p=per(); return s>=p.a && s<=p.b; };
@@ -676,38 +675,29 @@ function renderP3(){
   const a1=all.filter(keep(SN,AN,'m'));
   const cumF = arr => { let s=0; return arr.map(v=>s+=v); };
   let actM=ms.map(m=>sum(a1.filter(x=>mKey(x.ngay)===m),x=>x.kl)/1000), planM=ms.map(m=>planN([m])/1000);
-  if(S.cum3){
-    $('d3a').textContent='Đường: tấn quy khô cộng dồn từ đầu kỳ · cột: % đạt kế hoạch lũy kế đến từng tháng · bấm để lọc';
-    const ca=cumF(actM), cp=cumF(planM);
-    const ol=base(); ol.interaction={mode:'index',intersect:false};
-    ol.plugins.tooltip.callbacks={label:c=>` ${c.dataset.label}: ${fmt(c.parsed.y,1)} tấn`, afterBody:it=>{ const i=it[0].dataIndex; return cp[i]? `Đạt: ${fmt(ca[i]/cp[i]*100,0)}% kế hoạch lũy kế`:''; }};
-    ol.plugins.legend.labels.usePointStyle=false; ol.plugins.legend.labels.boxHeight=3; ol.plugins.legend.labels.boxWidth=22;
-    ol.onClick=(e,el)=>{ if(!el.length) return; pick(SN,'m')(ms[el[0].index]); };
-    const pr=ms.map(m=>fN.m===m?6:3.5);
-    const pctD=ca.map((v,i)=>cp[i]?v/cp[i]*100:null), pMax=Math.max(100,...pctD.filter(v=>v!=null));
-    const lMax=Math.max(...ca,...cp,1);
-    ol.scales.y.title={display:true,text:'tấn',color:P.mute,font:{size:10.5}};
-    ol.scales.y.min=-lMax*0.62; ol.scales.y.max=lMax*1.12; ol.scales.y.beginAtZero=false; ol.scales.y.grace=0;
-    ol.scales.y.ticks={...ol.scales.y.ticks,callback:v=>v<0||v>lMax?'':fmt(v)}; ol.scales.y.grid={color:c=>c.tick.value<0?'transparent':P.line};
-    ol.scales.y1={position:'right',min:0,max:Math.ceil(pMax*3.4/10)*10,grid:{display:false},border:{display:false},
-      ticks:{color:P.mute,font:{size:11},stepSize:50,callback:v=>v<=Math.ceil(pMax/10)*10?v+'%':''},title:{display:true,text:'% đạt',color:P.mute,font:{size:10.5}}};
-    ol.plugins.tooltip.callbacks.label=c=>c.dataset.yAxisID==='y1'?` ${c.dataset.label}: ${fmt(c.parsed.y,1)}%`:` ${c.dataset.label}: ${fmt(c.parsed.y,1)} tấn`;
-    ol.plugins.tooltip.callbacks.afterBody=()=>'';
-    ol.plugins.legend.labels.generateLabels=ch=>[{text:'Đạt (≥ 100%)',fillStyle:alpha(P.leaf,.8),strokeStyle:alpha(P.leaf,.8),lineWidth:0},{text:'Chưa đạt (< 100%)',fillStyle:alpha(P.red,.8),strokeStyle:alpha(P.red,.8),lineWidth:0},
-      ...ch.data.datasets.slice(1).map((d,i)=>({text:d.label,fillStyle:d.borderColor,strokeStyle:d.borderColor,lineWidth:0,datasetIndex:i+1,hidden:!ch.isDatasetVisible(i+1)}))];
-    draw('c3a',{type:'line',data:{labels:ms.map(mLbl),datasets:[
-      {type:'bar',label:'% đạt kế hoạch lũy kế',data:pctD,yAxisID:'y1',order:10,backgroundColor:ms.map((m,i)=>{ const c=pctD[i]!=null&&pctD[i]>=100?P.leaf:P.red; return fN.m&&fN.m!==m?alpha(c,.22):alpha(c,.8); }),borderRadius:4,maxBarThickness:34,
-        datalabels:{display:ctx=>pctD[ctx.dataIndex]!=null,anchor:'end',align:'start',offset:4,color:'#fff',font:{size:10,weight:'700',family:FONT},formatter:v=>fmt(v,0)+'%'}},
-      {label:'Lũy kế xuất thực tế',order:1,data:ca,borderColor:P.teal,backgroundColor:P.teal,borderWidth:2.5,cubicInterpolationMode:'monotone',pointRadius:pr,
-        datalabels:{...lineLbl(P.teal,v=>fT(v)),align:'top'}},
-      {label:'Lũy kế kế hoạch',order:2,data:cp,borderColor:P.sap,backgroundColor:P.sap,borderWidth:2.5,borderDash:[6,4],cubicInterpolationMode:'monotone',pointRadius:pr,pointStyle:'rectRot',
-        datalabels:{...lineLbl(P.sap,v=>fT(v)),align:'bottom'}}]},options:ol});
-  } else {
-    $('d3a').textContent='Cột: tấn quy khô (xanh: đạt kế hoạch · đỏ: chưa đạt) · đường: KL sai lệch sau chế biến (kg) · bấm cột để lọc';
-    barPlan('c3a', ms, ms.map(mLbl), actM, planM,
-    {sel:fN.m, onPick:pick(SN,'m'), showPct:false, passFail:true, planLbl:false,
-     line:{label:'KL sai lệch sau chế biến', unit:'kg', color:P.plum, data:(()=>{ const bM=[...new Set(a1.map(x=>x.b))].filter(b=>inP(lastX(b))); return ms.map(m=>sum(bM.filter(b=>mKey(lastX(b))===m),b=>BS_OF[b.ma_b]||0)); })()}});
-  }
+  const ca=cumF(actM), cp=cumF(planM);
+  const bMax=Math.max(...actM,...planM,1), lMax=Math.max(...ca,...cp,1);
+  const o3=base(); o3.interaction={mode:'index',intersect:false};
+  o3.scales.y={...o3.scales.y,min:0,max:Math.ceil(bMax*2.3/10)*10,grace:0,title:{display:true,text:'tấn / tháng',color:P.mute,font:{size:10.5}},
+    ticks:{color:P.mute,font:{size:11},callback:v=>v>bMax*1.1?'':fmt(v)},grid:{color:c=>c.tick.value>bMax*1.1?'transparent':P.line}};
+  o3.scales.y1={position:'right',min:-lMax*0.85,max:lMax*1.12,grid:{display:false},border:{display:false},title:{display:true,text:'tấn lũy kế',color:P.mute,font:{size:10.5}},
+    ticks:{color:P.mute,font:{size:11},callback:v=>v<0||v>lMax?'':fmt(v)}};
+  o3.plugins.tooltip.callbacks={label:c=>` ${c.dataset.label}: ${fmt(c.parsed.y,1)} tấn`, afterBody:it=>{ const i=it[0].dataIndex; return cp[i]? `Lũy kế đạt ${fmt(ca[i]/cp[i]*100,0)}% kế hoạch`:''; }};
+  o3.plugins.legend.labels.usePointStyle=false; o3.plugins.legend.labels.boxHeight=10;
+  o3.plugins.legend.labels.generateLabels=()=>[
+    {text:'Tháng đạt kế hoạch',fillStyle:P.leaf,strokeStyle:P.leaf,lineWidth:0},{text:'Tháng chưa đạt',fillStyle:P.red,strokeStyle:P.red,lineWidth:0},{text:'Kế hoạch tháng',fillStyle:'#C9D3CC',strokeStyle:'#C9D3CC',lineWidth:0},
+    {text:'Lũy kế thực tế',fillStyle:P.teal,strokeStyle:P.teal,lineWidth:0},{text:'Lũy kế kế hoạch',fillStyle:P.sap,strokeStyle:P.sap,lineWidth:0}];
+  o3.onClick=(e,el)=>{ if(!el.length) return; pick(SN,'m')(ms[el[0].index]); };
+  o3.onHover=(e,el)=>{ e.native.target.style.cursor = el.length?'pointer':'default'; };
+  const fd3=(c,i)=> fN.m&&fN.m!==ms[i]? alpha(c,.25):c, pr=ms.map(m=>fN.m===m?6:3.5);
+  draw('c3a',{type:'bar',data:{labels:ms.map(mLbl),datasets:[
+    {type:'line',label:'Lũy kế thực tế',data:ca,yAxisID:'y1',order:0,borderColor:P.teal,backgroundColor:P.teal,borderWidth:2.5,cubicInterpolationMode:'monotone',pointRadius:pr,
+      datalabels:{...lineLbl(P.teal,v=>fT(v)),align:'top'}},
+    {type:'line',label:'Lũy kế kế hoạch',data:cp,yAxisID:'y1',order:0,borderColor:P.sap,backgroundColor:P.sap,borderWidth:2.5,borderDash:[6,4],pointStyle:'rectRot',cubicInterpolationMode:'monotone',pointRadius:pr,
+      datalabels:{...lineLbl(P.sap,v=>fT(v)),align:'bottom'}},
+    {label:'Thực tế tháng',data:actM,yAxisID:'y',backgroundColor:actM.map((v,i)=>fd3(planM[i]&&v<planM[i]?P.red:P.leaf,i)),borderRadius:4,maxBarThickness:22,
+      datalabels:{...barLbl(v=>fT(v)),font:{size:10,weight:'700',family:FONT}}},
+    {label:'Kế hoạch tháng',data:planM,yAxisID:'y',backgroundColor:planM.map((v,i)=>fd3('#C9D3CC',i)),borderRadius:4,maxBarThickness:22,datalabels:{display:false}}]},options:o3});
   pieView(SN,'c3c','p3n',{o:O_DEF, mu:MU_DEF, src:SRC_DEF()}, all, x=>x.kl, AN);
 
   // bảng matrix: lần xuất (Mã B) → Mã A
@@ -858,7 +848,6 @@ function init(){
   document.querySelectorAll('.nav-it').forEach(b=>b.addEventListener('click',()=>go(b.dataset.p)));
   $('nxtSeg').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ S.nxt=b.dataset.v; $('nxtSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render(); }));
   document.querySelectorAll('.mini-seg[data-pv]').forEach(g=>g.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ S.pv[g.dataset.pv]=b.dataset.v; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render(); })));
-  $('cum3').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ S.cum3=b.dataset.v==='c'; $('cum3').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render(); }));
   $('t3open').addEventListener('click',()=>{ const s=TB.t3; if(s){ s.all.forEach(k=>s.open.add(k)); s.redraw(); } });
   $('t3close').addEventListener('click',()=>{ const s=TB.t3; if(s){ s.open.clear(); s.redraw(); } });
   $('drcDim')?.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ S.drcDim=b.dataset.v; $('drcDim').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render(); }));
